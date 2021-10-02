@@ -12,7 +12,7 @@ class WebSocket(web.View):
 
         ws = web.WebSocketResponse()
         await ws.prepare(self.request)
-        await ws.send_str('hello my dear mister Popponi')
+        await ws.send_str('connected')
 
         self.request.app['websockets'].append(ws)
 
@@ -22,24 +22,24 @@ class WebSocket(web.View):
                     await ws.close()
                 else:
                     json_msg = json.loads(msg.data)
-                    user_id = json_msg["user_id"]
-                    text = json_msg["text"]
+                    msg_id = json_msg.get("id")
+                    msg_text = json_msg.get("text")
 
-                    await ws.send_str(text)
+                    await ws.send_str(msg_text)
 
-                    if await ChatRoom(self.request.db).fetch_chatroom(user_id):
-                        await ChatRoom(self.request.db).update(user_id, text)
+                    if await ChatRoom(self.request.db).fetch_chatroom(msg_id):
+                        await ChatRoom(self.request.db).update(msg_id, msg_text)
                     else:
-                        await ChatRoom(self.request.db).create(user_id)
-                        await ChatRoom(self.request.db).update(user_id, text)
+                        await ChatRoom(self.request.db).create(msg_id)
+                        await ChatRoom(self.request.db).update(msg_id, msg_text)
 
-                    print(await ChatRoom(self.request.db).fetch_chatroom(user_id))
+                    print(await ChatRoom(self.request.db).fetch_chatroom(msg_id))
 
                     ws_connections = self.request.app['websockets'][:]
                     for ws_connection in ws_connections:
                         if ws_connection == ws:
                             pass
-                        await ws_connection.send_str(text)
+                        await ws_connection.send_str(msg_text)
 
             elif msg == WSMsgType.error:
                 print('ws connection closed with exception %s' % ws.exception())
@@ -52,7 +52,6 @@ class WebSocket(web.View):
 class ChatRoomController(web.View):
     async def get(self):
         data = self.request.query
-        user_id = data["user_id"]
         chat_room = await ChatRoom(self.request.db).fetch_chatrooms()
         response = {"chatrooms": chat_room}
         return web.Response(content_type='application/json', text=JSONEncoder().encode(response))
